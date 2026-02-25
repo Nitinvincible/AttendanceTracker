@@ -1,5 +1,18 @@
+# Web framework
 fastapi>=0.110.0
 uvicorn[standard]>=0.29.0
+
+# Database ORM
 sqlalchemy>=2.0.0
+
+# Data validation
 pydantic>=2.5.0
+
+# Form/multipart support (required by FastAPI)
 python-multipart>=0.0.9
+
+# CORS & HTTP utilities (included with fastapi, listed explicitly)
+starlette>=0.36.0
+
+# Type hints support for older Python versions (optional but safe)
+typing-extensions>=4.9.0

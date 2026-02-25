@@ -17,6 +17,12 @@ class StudentCreate(BaseModel):
     department: str
 
 
+class StudentUpdate(BaseModel):
+    name: str
+    roll_number: str
+    department: str
+
+
 class StudentResponse(BaseModel):
     id: int
     name: str

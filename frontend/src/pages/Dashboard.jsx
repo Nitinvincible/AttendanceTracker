@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { getDashboardStats, getWeeklyData } from '../api';
+import { getDashboardStats, getWeeklyData, getAttendanceHistory } from '../api';
 import { useTheme } from '../context/ThemeContext';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
-import { Users, UserCheck, UserX, TrendingUp, Loader } from 'lucide-react';
+import { Users, UserCheck, UserX, TrendingUp, Loader, CheckCircle2, XCircle, CalendarDays } from 'lucide-react';
 
 const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -33,14 +33,20 @@ export default function Dashboard() {
     const { occupation } = useTheme();
     const [stats, setStats] = useState(null);
     const [weekly, setWeekly] = useState([]);
+    const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const load = async () => {
             try {
-                const [s, w] = await Promise.all([getDashboardStats(), getWeeklyData()]);
+                const [s, w, h] = await Promise.all([
+                    getDashboardStats(),
+                    getWeeklyData(),
+                    getAttendanceHistory(),
+                ]);
                 setStats(s.data);
                 setWeekly(w.data);
+                setHistory(h.data);
             } catch (e) {
                 console.error(e);
             } finally {
@@ -89,6 +95,15 @@ export default function Dashboard() {
             bg: 'var(--accent-glow)',
         },
     ];
+
+    // Group history records by date for display
+    const byDate = {};
+    history.forEach(rec => {
+        const d = rec.date;
+        if (!byDate[d]) byDate[d] = [];
+        byDate[d].push(rec);
+    });
+    const sortedDates = Object.keys(byDate).sort((a, b) => b.localeCompare(a));
 
     return (
         <div>
@@ -189,6 +204,118 @@ export default function Dashboard() {
                         </div>
                     </div>
                 </div>
+            </div>
+
+            {/* ── Attendance Records ── */}
+            <div className="card" style={{ padding: '24px', marginTop: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+                    <CalendarDays size={17} color="var(--accent-light)" />
+                    <h2 style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                        Recent Attendance Records
+                    </h2>
+                </div>
+
+                {history.length === 0 ? (
+                    <div className="empty-state" style={{ padding: '28px 0' }}>
+                        <p style={{ fontSize: '0.85rem' }}>No attendance records yet — start marking attendance!</p>
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                        {sortedDates.map(dateStr => {
+                            const recs = byDate[dateStr];
+                            const presentCount = recs.filter(r => r.status === 'present').length;
+                            const absentCount = recs.filter(r => r.status === 'absent').length;
+                            const label = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-IN', {
+                                weekday: 'long', day: 'numeric', month: 'short', year: 'numeric'
+                            });
+                            return (
+                                <div key={dateStr}>
+                                    {/* Date header */}
+                                    <div style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: 12,
+                                        marginBottom: 10,
+                                        paddingBottom: 8,
+                                        borderBottom: '1px solid var(--border)',
+                                    }}>
+                                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                                            {label}
+                                        </span>
+                                        <span style={{
+                                            fontSize: '0.7rem', fontWeight: 600,
+                                            padding: '2px 8px', borderRadius: 999,
+                                            background: 'var(--green-bg)', color: 'var(--green)',
+                                        }}>
+                                            ✓ {presentCount} Present
+                                        </span>
+                                        <span style={{
+                                            fontSize: '0.7rem', fontWeight: 600,
+                                            padding: '2px 8px', borderRadius: 999,
+                                            background: 'var(--red-bg)', color: 'var(--red)',
+                                        }}>
+                                            ✗ {absentCount} Absent
+                                        </span>
+                                    </div>
+
+                                    {/* Records table */}
+                                    <div className="table-wrapper">
+                                        <table>
+                                            <thead>
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Name</th>
+                                                    <th>{occupation?.idLabel ?? 'ID'}</th>
+                                                    <th>{occupation?.groupLabel ?? 'Group'}</th>
+                                                    <th>Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {recs.map((rec, idx) => (
+                                                    <tr key={rec.id}>
+                                                        <td style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{idx + 1}</td>
+                                                        <td style={{ fontWeight: 600 }}>{rec.student?.name ?? '—'}</td>
+                                                        <td>
+                                                            <span className="badge" style={{
+                                                                background: 'var(--accent-glow)',
+                                                                color: 'var(--accent-light)',
+                                                                border: '1px solid var(--border-accent)',
+                                                            }}>
+                                                                {rec.student?.roll_number ?? '—'}
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ color: 'var(--text-secondary)' }}>{rec.student?.department ?? '—'}</td>
+                                                        <td>
+                                                            {rec.status === 'present' ? (
+                                                                <span style={{
+                                                                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                                                                    padding: '3px 10px', borderRadius: 999,
+                                                                    background: 'var(--green-bg)', color: 'var(--green)',
+                                                                    fontSize: '0.75rem', fontWeight: 700,
+                                                                }}>
+                                                                    <CheckCircle2 size={12} /> Present
+                                                                </span>
+                                                            ) : (
+                                                                <span style={{
+                                                                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                                                                    padding: '3px 10px', borderRadius: 999,
+                                                                    background: 'var(--red-bg)', color: 'var(--red)',
+                                                                    fontSize: '0.75rem', fontWeight: 700,
+                                                                }}>
+                                                                    <XCircle size={12} /> Absent
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
         </div>
     );

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { getStudents, createStudent, deleteStudent } from '../api';
+import { getStudents, createStudent, updateStudent, deleteStudent } from '../api';
 import { useTheme } from '../context/ThemeContext';
-import { Plus, Trash2, Search, Loader, Users } from 'lucide-react';
+import { Plus, Trash2, Pencil, Search, Loader, Users, X } from 'lucide-react';
 
 export default function Students() {
     const { occupation } = useTheme();
@@ -9,10 +9,18 @@ export default function Students() {
     const [filtered, setFiltered] = useState([]);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
-    const [showModal, setShowModal] = useState(false);
-    const [form, setForm] = useState({ name: '', roll_number: '', department: '' });
-    const [saving, setSaving] = useState(false);
-    const [error, setError] = useState('');
+
+    // Add modal
+    const [showAdd, setShowAdd] = useState(false);
+    const [addForm, setAddForm] = useState({ name: '', roll_number: '', department: '' });
+    const [addSaving, setAddSaving] = useState(false);
+    const [addError, setAddError] = useState('');
+
+    // Edit modal
+    const [editTarget, setEditTarget] = useState(null); // student object
+    const [editForm, setEditForm] = useState({ name: '', roll_number: '', department: '' });
+    const [editSaving, setEditSaving] = useState(false);
+    const [editError, setEditError] = useState('');
 
     const memberLabel = occupation?.memberLabel ?? 'Member';
     const memberLabelPlural = occupation?.memberLabelPlural ?? 'Members';
@@ -42,22 +50,46 @@ export default function Students() {
         ));
     }, [search, students]);
 
+    // --- Add ---
     const handleAdd = async (e) => {
         e.preventDefault();
-        setSaving(true);
-        setError('');
+        setAddSaving(true);
+        setAddError('');
         try {
-            await createStudent(form);
-            setShowModal(false);
-            setForm({ name: '', roll_number: '', department: '' });
+            await createStudent(addForm);
+            setShowAdd(false);
+            setAddForm({ name: '', roll_number: '', department: '' });
             await load();
         } catch (err) {
-            setError(err.response?.data?.detail || 'Failed to add. Please try again.');
+            setAddError(err.response?.data?.detail || 'Failed to add. Please try again.');
         } finally {
-            setSaving(false);
+            setAddSaving(false);
         }
     };
 
+    // --- Edit ---
+    const openEdit = (s) => {
+        setEditTarget(s);
+        setEditForm({ name: s.name, roll_number: s.roll_number, department: s.department });
+        setEditError('');
+    };
+
+    const handleEdit = async (e) => {
+        e.preventDefault();
+        setEditSaving(true);
+        setEditError('');
+        try {
+            await updateStudent(editTarget.id, editForm);
+            setEditTarget(null);
+            await load();
+        } catch (err) {
+            setEditError(err.response?.data?.detail || 'Failed to update. Please try again.');
+        } finally {
+            setEditSaving(false);
+        }
+    };
+
+    // --- Delete ---
     const handleDelete = async (id, name) => {
         if (!window.confirm(`Remove "${name}" from the system?`)) return;
         try {
@@ -76,7 +108,7 @@ export default function Students() {
                     <h1>{memberLabelPlural}</h1>
                     <p>{students.length} {memberLabelPlural.toLowerCase()} enrolled in {occupation?.fullName}</p>
                 </div>
-                <button className="btn btn-primary" onClick={() => { setShowModal(true); setError(''); }}>
+                <button className="btn btn-primary" onClick={() => { setShowAdd(true); setAddError(''); }}>
                     <Plus size={15} /> Add {memberLabel}
                 </button>
             </div>
@@ -112,7 +144,7 @@ export default function Students() {
                                     <th>{idLabel}</th>
                                     <th>{groupLabel}</th>
                                     <th>Added</th>
-                                    <th></th>
+                                    <th style={{ textAlign: 'right' }}>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -130,13 +162,24 @@ export default function Students() {
                                             {new Date(s.created_at).toLocaleDateString()}
                                         </td>
                                         <td>
-                                            <button
-                                                className="btn btn-danger"
-                                                style={{ padding: '6px 10px' }}
-                                                onClick={() => handleDelete(s.id, s.name)}
-                                            >
-                                                <Trash2 size={13} />
-                                            </button>
+                                            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                                                <button
+                                                    className="btn btn-ghost"
+                                                    style={{ padding: '6px 10px', border: '1px solid var(--border)' }}
+                                                    title="Edit"
+                                                    onClick={() => openEdit(s)}
+                                                >
+                                                    <Pencil size={13} />
+                                                </button>
+                                                <button
+                                                    className="btn btn-danger"
+                                                    style={{ padding: '6px 10px' }}
+                                                    title="Delete"
+                                                    onClick={() => handleDelete(s.id, s.name)}
+                                                >
+                                                    <Trash2 size={13} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -146,59 +189,99 @@ export default function Students() {
                 )}
             </div>
 
-            {/* Add modal */}
-            {showModal && (
-                <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                    <div className="modal" onClick={e => e.stopPropagation()}>
-                        <h2>Add {memberLabel}</h2>
-                        <form onSubmit={handleAdd}>
-                            <div className="form-group">
-                                <label>Full Name</label>
-                                <input
-                                    className="input"
-                                    required
-                                    placeholder={occupation?.namePlaceholder ?? 'Enter full name'}
-                                    value={form.name}
-                                    onChange={e => setForm({ ...form, name: e.target.value })}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>{idLabel}</label>
-                                <input
-                                    className="input"
-                                    required
-                                    placeholder={occupation?.idPlaceholder ?? 'Enter ID'}
-                                    value={form.roll_number}
-                                    onChange={e => setForm({ ...form, roll_number: e.target.value })}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>{groupLabel}</label>
-                                <input
-                                    className="input"
-                                    required
-                                    placeholder={occupation?.groupPlaceholder ?? 'Enter group'}
-                                    value={form.department}
-                                    onChange={e => setForm({ ...form, department: e.target.value })}
-                                />
-                            </div>
-                            {error && (
-                                <p style={{ color: 'var(--red)', fontSize: '0.8rem', marginBottom: 14, padding: '8px 12px', background: 'var(--red-bg)', borderRadius: '8px' }}>
-                                    {error}
-                                </p>
-                            )}
-                            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                                <button type="button" className="btn btn-ghost" onClick={() => setShowModal(false)}>
-                                    Cancel
-                                </button>
-                                <button type="submit" className="btn btn-primary" disabled={saving}>
-                                    {saving ? <><Loader size={13} className="spin" /> Saving...</> : `Add ${memberLabel}`}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+            {/* ── Add Modal ── */}
+            {showAdd && (
+                <MemberModal
+                    title={`Add ${memberLabel}`}
+                    form={addForm}
+                    setForm={setAddForm}
+                    onSubmit={handleAdd}
+                    onClose={() => setShowAdd(false)}
+                    saving={addSaving}
+                    error={addError}
+                    submitLabel={`Add ${memberLabel}`}
+                    occupation={occupation}
+                    idLabel={idLabel}
+                    groupLabel={groupLabel}
+                />
             )}
+
+            {/* ── Edit Modal ── */}
+            {editTarget && (
+                <MemberModal
+                    title={`Edit ${memberLabel}`}
+                    form={editForm}
+                    setForm={setEditForm}
+                    onSubmit={handleEdit}
+                    onClose={() => setEditTarget(null)}
+                    saving={editSaving}
+                    error={editError}
+                    submitLabel="Save Changes"
+                    occupation={occupation}
+                    idLabel={idLabel}
+                    groupLabel={groupLabel}
+                />
+            )}
+        </div>
+    );
+}
+
+function MemberModal({ title, form, setForm, onSubmit, onClose, saving, error, submitLabel, occupation, idLabel, groupLabel }) {
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" onClick={e => e.stopPropagation()}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                    <h2 style={{ margin: 0 }}>{title}</h2>
+                    <button className="btn btn-ghost" style={{ padding: '4px 8px' }} onClick={onClose}>
+                        <X size={16} />
+                    </button>
+                </div>
+                <form onSubmit={onSubmit}>
+                    <div className="form-group">
+                        <label>Full Name</label>
+                        <input
+                            className="input"
+                            required
+                            placeholder={occupation?.namePlaceholder ?? 'Enter full name'}
+                            value={form.name}
+                            onChange={e => setForm({ ...form, name: e.target.value })}
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label>{idLabel}</label>
+                        <input
+                            className="input"
+                            required
+                            placeholder={occupation?.idPlaceholder ?? 'Enter ID'}
+                            value={form.roll_number}
+                            onChange={e => setForm({ ...form, roll_number: e.target.value })}
+                        />
+                    </div>
+                    <div className="form-group">
+                        <label>{groupLabel}</label>
+                        <input
+                            className="input"
+                            required
+                            placeholder={occupation?.groupPlaceholder ?? 'Enter group'}
+                            value={form.department}
+                            onChange={e => setForm({ ...form, department: e.target.value })}
+                        />
+                    </div>
+                    {error && (
+                        <p style={{ color: 'var(--red)', fontSize: '0.8rem', marginBottom: 14, padding: '8px 12px', background: 'var(--red-bg)', borderRadius: '8px' }}>
+                            {error}
+                        </p>
+                    )}
+                    <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+                        <button type="button" className="btn btn-ghost" onClick={onClose}>
+                            Cancel
+                        </button>
+                        <button type="submit" className="btn btn-primary" disabled={saving}>
+                            {saving ? <><Loader size={13} className="spin" /> Saving...</> : submitLabel}
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     );
 }
