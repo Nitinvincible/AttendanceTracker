@@ -166,25 +166,56 @@
     background: var(--accent-glow);
 }
 
-/* Footer */
-.sidebar-footer {
+/* User section */
+.sidebar-user {
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 12px;
-    font-size: 0.72rem;
-    color: var(--text-muted);
     border-top: 1px solid var(--border);
     margin-top: 8px;
 }
 
-.status-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--green);
-    box-shadow: 0 0 8px var(--green);
+.user-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.user-details {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.user-name {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.user-company {
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.logout-btn {
+    padding: 6px !important;
+    border: 1px solid var(--border) !important;
     flex-shrink: 0;
+}
+
+.logout-btn:hover {
+    color: var(--red) !important;
+    border-color: var(--red) !important;
 }
 
 /* Mobile */

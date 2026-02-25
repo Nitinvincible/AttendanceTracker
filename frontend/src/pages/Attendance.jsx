@@ -1,78 +1,66 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getStudents, markAttendance, getAttendanceByDate } from '../api';
 import { useTheme } from '../context/ThemeContext';
 import { CalendarDays, CheckCircle, XCircle, Save, Loader, ClipboardCheck } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'react-hot-toast';
 
 export default function Attendance() {
     const { occupation } = useTheme();
+    const queryClient = useQueryClient();
     const memberLabelPlural = occupation?.memberLabelPlural ?? 'Members';
     const idLabel = occupation?.idLabel ?? 'ID';
     const groupLabel = occupation?.groupLabel ?? 'Group';
 
-    const [students, setStudents] = useState([]);
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [statuses, setStatuses] = useState({});
-    const [loading, setLoading] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [saved, setSaved] = useState(false);
 
-    useEffect(() => {
-        const load = async () => {
-            setLoading(true);
-            try {
-                const sRes = await getStudents();
-                setStudents(sRes.data);
-                const init = {};
-                sRes.data.forEach(s => { init[s.id] = 'present'; });
-                setStatuses(init);
-            } catch (e) {
-                console.error(e);
-            } finally {
-                setLoading(false);
-            }
-        };
-        load();
-    }, []);
+    const { data: studentsData, isLoading: loadingStudents } = useQuery({
+        queryKey: ['students'],
+        queryFn: getStudents,
+    });
+    const students = studentsData?.data || [];
+
+    const { data: historyData, isLoading: loadingHistory } = useQuery({
+        queryKey: ['attendance', date],
+        queryFn: () => getAttendanceByDate(date),
+        enabled: students.length > 0,
+    });
 
     useEffect(() => {
         if (!students.length) return;
-        const loadExisting = async () => {
-            try {
-                const res = await getAttendanceByDate(date);
-                if (res.data.length > 0) {
-                    const map = {};
-                    res.data.forEach(r => { map[r.student_id] = r.status; });
-                    students.forEach(s => { if (!map[s.id]) map[s.id] = 'present'; });
-                    setStatuses(map);
-                } else {
-                    const init = {};
-                    students.forEach(s => { init[s.id] = 'present'; });
-                    setStatuses(init);
-                }
-            } catch (e) {
-                console.error(e);
-            }
-        };
-        loadExisting();
-    }, [date, students]);
+        const history = historyData?.data || [];
+        const map = {};
+        if (history.length > 0) {
+            history.forEach(r => { map[r.student_id] = r.status; });
+            students.forEach(s => { if (!map[s.id]) map[s.id] = 'present'; });
+        } else {
+            students.forEach(s => { map[s.id] = 'present'; });
+        }
+        setStatuses(map);
+    }, [students, historyData]);
+
+    const loading = loadingStudents || loadingHistory;
 
     const toggle = (id) => {
         setStatuses(prev => ({ ...prev, [id]: prev[id] === 'present' ? 'absent' : 'present' }));
     };
 
-    const handleSubmit = async () => {
-        setSaving(true);
-        setSaved(false);
-        try {
-            const records = students.map(s => ({ student_id: s.id, status: statuses[s.id] }));
-            await markAttendance({ date, records });
-            setSaved(true);
-            setTimeout(() => setSaved(false), 3000);
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setSaving(false);
+    const mutation = useMutation({
+        mutationFn: (records) => markAttendance({ date, records }),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['attendance']);
+            queryClient.invalidateQueries(['dashboard']);
+            toast.success('Attendance saved successfully!');
+        },
+        onError: () => {
+            toast.error('Failed to save attendance.');
         }
+    });
+
+    const handleSubmit = () => {
+        const records = students.map(s => ({ student_id: s.id, status: statuses[s.id] }));
+        mutation.mutate(records);
     };
 
     const markAll = (status) => {
@@ -116,9 +104,9 @@ export default function Attendance() {
                     <button
                         className="btn btn-primary"
                         onClick={handleSubmit}
-                        disabled={saving || students.length === 0}
+                        disabled={mutation.isPending || students.length === 0}
                     >
-                        {saving
+                        {mutation.isPending
                             ? <><Loader size={13} className="spin" /> Saving...</>
                             : <><Save size={14} /> Save Attendance</>}
                     </button>
@@ -140,21 +128,6 @@ export default function Attendance() {
                         </button>
                     </div>
                 </div>
-                {saved && (
-                    <div style={{
-                        padding: '12px 18px',
-                        background: 'var(--green-bg)',
-                        border: '1px solid rgba(34,197,94,0.3)',
-                        borderRadius: 'var(--radius-sm)',
-                        color: 'var(--green)',
-                        fontSize: '0.875rem',
-                        fontWeight: 600,
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        animation: 'slideUp 0.2s ease',
-                    }}>
-                        <CheckCircle size={15} /> Attendance saved!
-                    </div>
-                )}
             </div>
 
             {/* Student list */}

@@ -1,1 +1,1 @@
-# Empty init file to make routers a package
+from routers import students, attendance, dashboard, auth, departments, settings, employees

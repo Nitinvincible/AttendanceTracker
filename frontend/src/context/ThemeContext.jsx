@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { getSettings } from '../api';
+import { useAuth } from './AuthContext';
 
-export const OCCUPATIONS = {
+export const THEMES = {
     medical: {
         id: 'medical',
         name: 'Medical',
@@ -70,33 +72,79 @@ export const OCCUPATIONS = {
 const ThemeContext = createContext(null);
 
 export function ThemeProvider({ children }) {
-    const [occupationType, setOccupationTypeState] = useState(() => {
-        return localStorage.getItem('att_occupation') || null;
+    const { user } = useAuth();
+    const [themeId, setThemeIdState] = useState(() => {
+        return localStorage.getItem('att_theme') || 'corporate';
     });
+    const [customLabels, setCustomLabels] = useState(null);
 
-    const setOccupationType = (type) => {
-        setOccupationTypeState(type);
-        localStorage.setItem('att_occupation', type);
-        document.body.setAttribute('data-theme', type);
+    // Load settings from API when user is logged in
+    useEffect(() => {
+        if (!user) return;
+        getSettings()
+            .then((res) => {
+                const data = res.data;
+                if (data.theme_id) {
+                    setThemeIdState(data.theme_id);
+                    localStorage.setItem('att_theme', data.theme_id);
+                    document.body.setAttribute('data-theme', data.theme_id);
+                }
+                if (data.custom_labels) {
+                    setCustomLabels(data.custom_labels);
+                }
+            })
+            .catch(() => { });
+    }, [user]);
+
+    const setThemeId = (id) => {
+        setThemeIdState(id);
+        localStorage.setItem('att_theme', id);
+        document.body.setAttribute('data-theme', id);
     };
 
-    const clearOccupation = () => {
-        setOccupationTypeState(null);
-        localStorage.removeItem('att_occupation');
+    const clearTheme = () => {
+        setThemeIdState('corporate');
+        localStorage.removeItem('att_theme');
         document.body.removeAttribute('data-theme');
     };
 
-    // Apply theme on mount if already selected
     useEffect(() => {
-        if (occupationType) {
-            document.body.setAttribute('data-theme', occupationType);
+        if (themeId) {
+            document.body.setAttribute('data-theme', themeId);
         }
     }, []);
 
-    const occupation = occupationType ? OCCUPATIONS[occupationType] : null;
+    // Merge preset theme with custom labels
+    const baseTheme = THEMES[themeId] || THEMES.corporate;
+    const theme = customLabels
+        ? {
+            ...baseTheme,
+            memberLabel: customLabels.member_label || baseTheme.memberLabel,
+            memberLabelPlural: customLabels.member_label_plural || baseTheme.memberLabelPlural,
+            idLabel: customLabels.id_label || baseTheme.idLabel,
+            groupLabel: customLabels.group_label || baseTheme.groupLabel,
+            namePlaceholder: customLabels.name_placeholder || baseTheme.namePlaceholder,
+            idPlaceholder: customLabels.id_placeholder || baseTheme.idPlaceholder,
+            groupPlaceholder: customLabels.group_placeholder || baseTheme.groupPlaceholder,
+        }
+        : baseTheme;
 
     return (
-        <ThemeContext.Provider value={{ occupationType, occupation, setOccupationType, clearOccupation }}>
+        <ThemeContext.Provider
+            value={{
+                themeId,
+                theme,
+                setThemeId,
+                clearTheme,
+                customLabels,
+                setCustomLabels,
+                // backward compat aliases
+                occupationType: themeId,
+                occupation: theme,
+                setOccupationType: setThemeId,
+                clearOccupation: clearTheme,
+            }}
+        >
             {children}
         </ThemeContext.Provider>
     );
