@@ -99,6 +99,14 @@ npm install
 npm run dev
 # → http://localhost:5173
 ```
+---
+
+## 🚀 Live Demo
+| Layer    | URL |
+|----------|-----|
+| Frontend | https://attendancerackert.vercel.app/ |
+| Backend  | https://attendance-backend-r2c6.onrender.com |
+| API Docs | https://attendance-backend-r2c6.onrender.com/docs |
 
 ---
 
