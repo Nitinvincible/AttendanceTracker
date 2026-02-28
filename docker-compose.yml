@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+  # ── Backend (FastAPI + SQLite) ─────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: attendance_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Override these or use a .env file at project root
+      - SECRET_KEY=${SECRET_KEY:-change-this-secret-in-production}
+    volumes:
+      # Persist the SQLite database file across container restarts
+      - db_data:/app/data
+    networks:
+      - attendance_net
+
+  # ── Frontend (React/Vite → nginx) ─────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Points the React app to the backend
+        VITE_API_URL: http://localhost:8000
+    container_name: attendance_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - attendance_net
+
+# ── Named volume for SQLite persistence ───────────────────────────
+volumes:
+  db_data:
+
+    # ── Internal network ──────────────────────────────────────────────
+networks:
+  attendance_net:
+    driver: bridge
